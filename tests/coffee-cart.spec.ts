@@ -1,79 +1,81 @@
-import { test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 
-// App under test: Coffee Cart — https://seleniumbase.io/coffee/
-// Routes: menu — /coffee/, cart — /coffee/cart
-//
-// This file is a structural skeleton only. Test bodies are intentionally
-// left as test.skip(true, 'TODO: ...') placeholders — no locators or
-// expect() assertions are implemented yet. Replace each TODO with the
-// real steps/assertions described in the comment.
+async function addDrinkToCart(page: Page, drinkName: string) {
+  const drink = page.locator(`.cup-body[aria-label="${drinkName}"]`);
+  await expect(drink).toBeVisible();
+  await drink.click({ button: 'right' });
+  await page.locator('dialog').getByRole('button', { name: 'Yes' }).click();
+}
 
 test.describe('Coffee Cart', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/coffee/');
   });
 
-  test('Smoke: menu loads with drinks list and Total button @smoke', async () => {
-    test.skip(
-      true,
-      'TODO: verify the cup list is visible and the Total/checkout button is visible',
-    );
+  test('Smoke: menu loads with drinks list and Total button @smoke', async ({ page }) => {
+    await expect(page.locator('.cup-body')).toHaveCount(9);
+    await expect(page.locator('.cup-body').first()).toBeVisible();
+    await expect(page.getByLabel('Cart page')).toContainText('cart (0)');
+    await expect(page.locator('button[data-test="checkout"]')).toHaveText('Total: $0.00');
   });
 
-  test('Adding two different drinks updates the header cart counter and Total', async () => {
-    test.skip(
-      true,
-      'TODO: click two different cups (e.g. by aria-label/data-test), then assert ' +
-        'header "cart (2)" text and that Total equals the sum of the two drink prices',
-    );
+  test('Adding two different drinks updates the header cart counter and Total', async ({ page }) => {
+    await addDrinkToCart(page, 'Espresso');
+    await addDrinkToCart(page, 'Mocha');
+
+    await expect(page.getByLabel('Cart page')).toHaveText('cart (2)');
+    await expect(page.locator('button[data-test="checkout"]')).toHaveText('Total: $18.00');
   });
 
-  test('Cart page lists exactly the added items', async () => {
-    test.skip(
-      true,
-      'TODO: add 2 drinks, navigate to /coffee/cart, assert item rows ' + 'locator.toHaveCount(2)',
-    );
+  test('Cart page lists exactly the added items', async ({ page }) => {
+    await addDrinkToCart(page, 'Espresso');
+    await addDrinkToCart(page, 'Mocha');
+    await page.getByLabel('Cart page').click();
+    await page.waitForURL(/\/coffee\/cart/);
+
+    const rows = page.locator('.list > div > ul > li.list-item');
+    await expect(rows).toHaveCount(2);
+    await expect(rows.filter({ hasText: 'Espresso' })).toHaveCount(1);
+    await expect(rows.filter({ hasText: 'Mocha' })).toHaveCount(1);
   });
 
-  test('Increasing item quantity on the cart page updates counter and Total', async () => {
-    test.skip(
-      true,
-      'TODO: on /coffee/cart, click the "+" control for one item, then assert ' +
-        'header cart counter and Total reflect the new quantity/sum',
-    );
+  test('Increasing item quantity on the cart page updates counter and Total', async ({ page }) => {
+    await addDrinkToCart(page, 'Espresso');
+    await addDrinkToCart(page, 'Mocha');
+    await page.getByLabel('Cart page').click();
+    await page.waitForURL(/\/coffee\/cart/);
+
+    const espressoRow = page.locator('.list > div > ul > li.list-item').filter({ hasText: 'Espresso' });
+    await espressoRow.locator('button[aria-label="Add one Espresso"]').click();
+
+    await expect(page.getByLabel('Cart page')).toHaveText('cart (3)');
+    await expect(page.locator('button[data-test="checkout"]')).toHaveText('Total: $28.00');
   });
 
-  test('Empty cart shows no items on a fresh session', async () => {
-    test.skip(
-      true,
-      'TODO: navigate straight to /coffee/cart without adding anything, assert ' +
-        'item list locator.toHaveCount(0) (or the list container is hidden)',
-    );
+  test('Empty cart shows no items on a fresh session', async ({ page }) => {
+    await page.goto('/coffee/cart');
+
+    await expect(page.locator('.list > div > ul > li.list-item')).toHaveCount(0);
+    await expect(page.getByText('No coffee, go add some.')).toBeVisible();
   });
 
-  test('Payment modal shows Name, Email and Submit', async () => {
-    test.skip(
-      true,
-      'TODO: click the Total/Pay button, assert the payment modal is visible, ' +
-        'then use expect.soft for the Name field, Email field and Submit button',
-    );
+  test('Payment modal shows Name, Email and Submit', async ({ page }) => {
+    await addDrinkToCart(page, 'Espresso');
+    await page.locator('button[data-test="checkout"]').click();
+    await expect(page.locator('.modal')).toBeVisible();
+
+    await expect.soft(page.locator('#name')).toBeVisible();
+    await expect.soft(page.locator('#email')).toBeVisible();
+    await expect.soft(page.locator('#submit-payment')).toBeVisible();
   });
 
   test.describe('Optional', () => {
     test('Promo dialog after a 3rd drink is dismissed with No', async () => {
-      test.skip(
-        true,
-        'TODO (bonus): add 3 drinks so the promo dialog appears, click "No", ' +
-          'then assert the scenario completes (e.g. cart still has 3 items)',
-      );
+      test.skip(true, 'Optional bonus implemented later if needed.');
     });
 
     test('Completed payment form shows a success message', async () => {
-      test.skip(
-        true,
-        'TODO (bonus): open the payment modal, fill Name and Email, click Submit, ' +
-          'assert a success message/state appears',
-      );
+      test.skip(true, 'Optional bonus implemented later if needed.');
     });
 
     test('Skipped on a specific browser with a documented reason', async ({ browserName }) => {
@@ -81,13 +83,13 @@ test.describe('Coffee Cart', () => {
         browserName === 'webkit',
         'webkit project is disabled in playwright.config.ts for this assignment',
       );
-      test.skip(true, 'TODO (bonus): implement the real assertions for this scenario');
+      test.skip(true, 'Optional bonus implemented later if needed.');
     });
 
     test('Annotated with a tracking issue', async () => {
       const issueUrl = 'https://example.com/issues/123';
       test.info().annotations.push({ type: 'issue', description: issueUrl });
-      test.skip(true, 'TODO (bonus): implement the real assertions for this scenario');
+      test.skip(true, 'Optional bonus implemented later if needed.');
     });
   });
 });
